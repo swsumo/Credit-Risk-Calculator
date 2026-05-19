@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Credit Risk{% endblock %} | Swapnil Mogal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h2>💳 Credit Risk</h2>
+      <p>XGBoost · SHAP · Groq AI</p>
+    </div>
+    <div class="sidebar-user">
+      <div class="name">{{ user.full_name }}</div>
+      <div class="role">{{ user.role | capitalize }}</div>
+    </div>
+    <nav class="nav">
+      <a href="{{ url_for('dashboard') }}"  class="{{ 'active' if active_page == 'dashboard' }}">
+        <span class="icon">📊</span> Dashboard
+      </a>
+      <a href="{{ url_for('predictor') }}" class="{{ 'active' if active_page == 'predictor' }}">
+        <span class="icon">🎯</span> Live Predictor
+      </a>
+      <a href="{{ url_for('batch') }}"     class="{{ 'active' if active_page == 'batch' }}">
+        <span class="icon">📋</span> Batch Predict
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <form action="{{ url_for('logout') }}">
+        <button type="submit" class="btn-logout">Logout</button>
+      </form>
+    </div>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

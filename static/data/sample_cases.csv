@@ -1,0 +1,6 @@
+case_label,age,gender,education,family_status,n_children,income,loan_amt,annuity,own_car,own_realty,ext1,ext2,ext3,emp_type,years_employed,n_inquiries
+BEST - Senior female professional excellent CIBIL,42,Female,Higher education,Married,0,1400000,300000,10500,1,1,85,860,82,Employed,18,0
+GOOD - Experienced female stable income good CIBIL,36,Female,Higher education,Married,1,650000,450000,15750,0,1,70,775,68,Employed,9,1
+MEDIUM - Male married average profile fair CIBIL,31,Male,Secondary / secondary special,Married,1,380000,500000,17500,0,0,52,620,48,Employed,4,4
+BAD - Young male 2 children poor CIBIL high loan,26,Male,Incomplete higher,Single / not married,2,200000,700000,24500,0,0,28,430,32,Employed,1,9
+WORST - Unemployed male 3 children near-zero CIBIL,23,Male,Lower secondary,Single / not married,3,110000,950000,33250,0,0,10,315,12,Unemployed,0,16

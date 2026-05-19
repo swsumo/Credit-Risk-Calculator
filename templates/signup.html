@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up | Credit Risk Scoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">💳</div>
+    <div class="login-title">Create Account</div>
+    <div class="login-sub">Join the Credit Risk Scoring platform</div>
+
+    {% if error %}
+    <div class="login-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('signup') }}">
+      <div class="form-group">
+        <label for="full_name">Full Name</label>
+        <input type="text" id="full_name" name="full_name" placeholder="e.g. Swapnil Mogal" required>
+      </div>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username"
+               placeholder="3-20 chars, letters/numbers/_" pattern="[a-zA-Z0-9_]{3,20}" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Min. 6 characters" minlength="6" required>
+      </div>
+      <div class="form-group">
+        <label for="confirm">Confirm Password</label>
+        <input type="password" id="confirm" name="confirm" placeholder="Repeat password" required>
+      </div>
+      <button type="submit" class="btn-primary">Create Account</button>
+    </form>
+
+    <p class="hint" style="margin-top:16px">
+      Already have an account? <a href="{{ url_for('login') }}" style="color:var(--accent)">Login</a>
+    </p>
+  </div>
+</div>
+<script>
+// Client-side confirm match
+document.querySelector('form').addEventListener('submit', e => {
+  const p = document.getElementById('password').value;
+  const c = document.getElementById('confirm').value;
+  if (p !== c) { e.preventDefault(); alert('Passwords do not match.'); }
+});
+</script>
+</body>
+</html>

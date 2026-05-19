@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "username": "swapnil",
+      "password_hash": "$2b$12$zbmHVUoVbOWaqfd0kT1k1.ccE9icPfFdHg2tklcd1Vi/HG0xyxdou",
+      "role": "admin",
+      "full_name": "Swapnil Mogal"
+    },
+    {
+      "username": "demo",
+      "password_hash": "$2b$12$j23C9YVMMIis4vvmNIsbWu2wlQZXKdAiJgETiM2usip/AYNi66xTC",
+      "role": "viewer",
+      "full_name": "Demo User"
+    }
+  ]
+}

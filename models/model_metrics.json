@@ -1,0 +1,33 @@
+{
+  "logistic_regression": {
+    "model": "Logistic Regression",
+    "roc_auc": 0.7431,
+    "pr_auc": 0.2322,
+    "f1": 0.2944,
+    "precision": 0.2516,
+    "recall": 0.3547,
+    "f2": 0.3278,
+    "threshold": 0.44
+  },
+  "xgboost_credit": {
+    "model": "XGBoost",
+    "roc_auc": 0.7611,
+    "pr_auc": 0.252,
+    "f1": 0.3053,
+    "precision": 0.2362,
+    "recall": 0.4318,
+    "f2": 0.3704,
+    "threshold": 0.64
+  },
+  "lightgbm_credit": {
+    "model": "LightGBM",
+    "roc_auc": 0.7634,
+    "pr_auc": 0.2545,
+    "f1": 0.3102,
+    "precision": 0.2485,
+    "recall": 0.4127,
+    "f2": 0.3645,
+    "threshold": 0.36
+  },
+  "best_model": "lightgbm_credit"
+}

@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Model Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Model Performance Dashboard</h1>
+  <p>LightGBM · XGBoost · Logistic Regression — trained on 307,511 real Home Credit applications with bureau + payment history</p>
+</div>
+
+<!-- KPI cards -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="label">Best Model</div>
+    <div class="value" style="font-size:20px">{{ best_label }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="label">ROC-AUC</div>
+    <div class="value">{{ best.roc_auc }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="label">PR-AUC</div>
+    <div class="value">{{ best.pr_auc }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="label">Optimal Threshold</div>
+    <div class="value">{{ thresholds[best_key] }}</div>
+  </div>
+</div>
+
+<!-- Model comparison -->
+<div class="card">
+  <h2>Model Comparison</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Model</th><th>ROC-AUC</th><th>PR-AUC</th>
+        <th>F1</th><th>Precision</th><th>Recall</th><th>Threshold</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in models_table %}
+      <tr {% if m.best %}class="best-row"{% endif %}>
+        <td>{{ m.name }}{% if m.best %} ★{% endif %}</td>
+        <td>{{ m.roc_auc }}</td>
+        <td>{{ m.pr_auc }}</td>
+        <td>{{ m.f1 }}</td>
+        <td>{{ m.precision }}</td>
+        <td>{{ m.recall }}</td>
+        <td>{{ m.threshold }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Evaluation plots with tabs -->
+<div class="card">
+  <h2>Evaluation Plots</h2>
+  <div class="tabs" id="eval-tabs">
+    <button class="tab-btn active" data-target="tab-roc">ROC · PR Curves</button>
+    <button class="tab-btn" data-target="tab-pr">Confusion · Learning</button>
+    <button class="tab-btn" data-target="tab-cm">Feature Importance</button>
+  </div>
+  <div id="tab-roc" class="tab-panel active">
+    <div class="grid-2">
+      <div>
+        {% if plots.roc_curves %}
+        <img src="data:image/png;base64,{{ plots.roc_curves }}" class="plot-img">
+        <p class="plot-caption">ROC curves — higher AUC = better discrimination.</p>
+        {% endif %}
+      </div>
+      <div>
+        {% if plots.pr_curves %}
+        <img src="data:image/png;base64,{{ plots.pr_curves }}" class="plot-img">
+        <p class="plot-caption">PR curves — more honest for imbalanced classes.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div id="tab-pr" class="tab-panel">
+    <div class="grid-2">
+      <div>
+        {% if plots.confusion_matrix %}
+        <img src="data:image/png;base64,{{ plots.confusion_matrix }}" class="plot-img">
+        <p class="plot-caption">Confusion matrix at optimal threshold.</p>
+        {% endif %}
+      </div>
+      <div>
+        {% if plots.learning_curve %}
+        <img src="data:image/png;base64,{{ plots.learning_curve }}" class="plot-img">
+        <p class="plot-caption">XGBoost learning curve — validation AUC vs boosting rounds.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div id="tab-cm" class="tab-panel">
+    {% if plots.feature_importance %}
+    <img src="data:image/png;base64,{{ plots.feature_importance }}" class="plot-img">
+    <p class="plot-caption">Top 25 features by XGBoost gain. EXT_SOURCE_2 and IS_UNEMPLOYED dominate.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Threshold Calibration -->
+<div class="card" id="threshold-card">
+  <h2>Business Threshold Calibration
+    <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:8px">
+      Drag the slider — a real bank sets this based on their risk appetite
+    </span>
+  </h2>
+
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start">
+    <div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600">
+          Approval Threshold: <span id="thresh-display" style="color:var(--blue);font-size:18px;font-weight:700">{{ thresholds[best_key] }}</span>
+        </label>
+        <input type="range" id="thresh-slider" min="0.05" max="0.95" step="0.01"
+               value="{{ thresholds[best_key] }}" style="width:100%;margin-top:6px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px">
+          <span>← More approvals (riskier)</span>
+          <span>(safer) Fewer approvals →</span>
+        </div>
+      </div>
+      <canvas id="thresh-chart" height="160"></canvas>
+    </div>
+
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:10px">At this threshold:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="thresh-kpi" id="tk-approval">
+          <div class="tk-label">Approval Rate</div>
+          <div class="tk-val" id="tv-approval">—</div>
+        </div>
+        <div class="thresh-kpi" id="tk-precision">
+          <div class="tk-label">Precision on Defaults</div>
+          <div class="tk-val" id="tv-precision">—</div>
+          <div class="tk-sub">of flagged loans, how many truly default</div>
+        </div>
+        <div class="thresh-kpi" id="tk-recall">
+          <div class="tk-label">Recall on Defaults</div>
+          <div class="tk-val" id="tv-recall">—</div>
+          <div class="tk-sub">of actual defaults, how many we catch</div>
+        </div>
+        <div class="thresh-kpi" id="tk-f1">
+          <div class="tk-label">F1 Score</div>
+          <div class="tk-val" id="tv-f1">—</div>
+        </div>
+      </div>
+      <div class="thresh-tip" id="thresh-tip"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SHAP section -->
+<div class="card">
+  <h2>SHAP Explainability Analysis</h2>
+  <div class="grid-2">
+    <div>
+      {% if plots.shap_summary_bar %}
+      <img src="data:image/png;base64,{{ plots.shap_summary_bar }}" class="plot-img">
+      <p class="plot-caption">Global feature importance — mean |SHAP| across all test samples.</p>
+      {% endif %}
+    </div>
+    <div>
+      {% if plots.shap_summary_dot %}
+      <img src="data:image/png;base64,{{ plots.shap_summary_dot }}" class="plot-img">
+      <p class="plot-caption">Beeswarm plot — distribution of SHAP impacts per feature.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% if plots.shap_dependence_ext2 %}
+  <div class="mt-16">
+    <img src="data:image/png;base64,{{ plots.shap_dependence_ext2 }}" class="plot-img">
+    <p class="plot-caption">EXT_SOURCE_2 dependence — applicants below ~0.3 have sharply higher default risk.</p>
+  </div>
+  {% endif %}
+  <div class="grid-2 mt-16">
+    <div>
+      {% if plots.shap_waterfall_high_risk %}
+      <img src="data:image/png;base64,{{ plots.shap_waterfall_high_risk }}" class="plot-img">
+      <p class="plot-caption">High-risk applicant — features pushing default probability up.</p>
+      {% endif %}
+    </div>
+    <div>
+      {% if plots.shap_waterfall_low_risk %}
+      <img src="data:image/png;base64,{{ plots.shap_waterfall_low_risk }}" class="plot-img">
+      <p class="plot-caption">Low-risk applicant — features protecting against default.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dataset stats -->
+<div class="card">
+  <h2>Dataset Statistics</h2>
+  <div>
+    <div class="stat-row">
+      <div class="stat-item">
+        <div class="s-label">Total Applications</div>
+        <div class="s-value">{{ "{:,}".format(stats.n_rows) }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="s-label">Default Rate</div>
+        <div class="s-value">{{ "%.2f%%"|format(stats.default_rate * 100) }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="s-label">Features</div>
+        <div class="s-value">{{ stats.n_cols }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="s-label">Avg Loan (Non-default)</div>
+        <div class="s-value">₹{{ "{:,.0f}".format(stats.avg_loan_nondefault) }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="s-label">Avg Loan (Default)</div>
+        <div class="s-value">₹{{ "{:,.0f}".format(stats.avg_loan_default) }}</div>
+      </div>
+    </div>
+    <div class="tabs" id="eda-tabs">
+      <button class="tab-btn active" data-target="eda-imb">Class Balance</button>
+      <button class="tab-btn" data-target="eda-ext">External Scores</button>
+      <button class="tab-btn" data-target="eda-cat">Categorical Rates</button>
+    </div>
+    <div id="eda-imb" class="tab-panel active">
+      {% if plots.class_imbalance %}
+      <img src="data:image/png;base64,{{ plots.class_imbalance }}" class="plot-img" style="max-width:600px;display:block;margin:auto">
+      {% endif %}
+    </div>
+    <div id="eda-ext" class="tab-panel">
+      {% if plots.ext_sources_boxplot %}
+      <img src="data:image/png;base64,{{ plots.ext_sources_boxplot }}" class="plot-img">
+      {% endif %}
+    </div>
+    <div id="eda-cat" class="tab-panel">
+      {% if plots.categorical_default_rates %}
+      <img src="data:image/png;base64,{{ plots.categorical_default_rates }}" class="plot-img">
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.thresh-kpi {
+  background: var(--light); border-radius: 8px; padding: 10px 14px;
+}
+.tk-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.tk-val   { font-size: 20px; font-weight: 700; color: var(--blue); margin-top: 2px; }
+.tk-sub   { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.thresh-tip {
+  margin-top: 10px; font-size: 12px; line-height: 1.5;
+  padding: 8px 12px; border-radius: 8px;
+}
+.thresh-tip.conservative { background: #FADBD8; color: #922B21; }
+.thresh-tip.balanced     { background: #D5F5E3; color: #1E8449; }
+.thresh-tip.aggressive   { background: #FDEBD0; color: #B7770D; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Generic tabs handler
+document.querySelectorAll('.tabs').forEach(tabGroup => {
+  tabGroup.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabGroup.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.target;
+      const parent = tabGroup.parentElement;
+      parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(target).classList.add('active');
+    });
+  });
+});
+
+// ── Threshold Calibration Slider ──────────────────────────────
+let threshData = null;
+let threshChart = null;
+
+async function loadThreshData() {
+  const resp = await fetch('/api/threshold_metrics');
+  const json = await resp.json();
+  threshData = json.data;
+
+  const ctx = document.getElementById('thresh-chart').getContext('2d');
+  threshChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: threshData.map(d => d.threshold.toFixed(2)),
+      datasets: [
+        { label: 'Precision', data: threshData.map(d => d.precision),
+          borderColor: '#1A5276', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0 },
+        { label: 'Recall', data: threshData.map(d => d.recall),
+          borderColor: '#E74C3C', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0 },
+        { label: 'F1', data: threshData.map(d => d.f1),
+          borderColor: '#27AE60', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0 },
+        { label: 'Approval Rate %', data: threshData.map(d => d.approval_rate / 100),
+          borderColor: '#E67E22', backgroundColor: 'transparent', borderWidth: 1.5,
+          borderDash: [4,3], pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, font: { size: 10 } }, title: { display: true, text: 'Threshold' } },
+        y: { min: 0, max: 1, ticks: { font: { size: 10 } } }
+      },
+      animation: false,
+    }
+  });
+
+  // Draw initial vertical line and update KPIs
+  updateThreshold(parseFloat(document.getElementById('thresh-slider').value));
+}
+
+function updateThreshold(val) {
+  if (!threshData) return;
+  document.getElementById('thresh-display').textContent = val.toFixed(2);
+
+  const closest = threshData.reduce((a, b) =>
+    Math.abs(b.threshold - val) < Math.abs(a.threshold - val) ? b : a);
+
+  document.getElementById('tv-approval').textContent  = closest.approval_rate + '%';
+  document.getElementById('tv-precision').textContent = (closest.precision * 100).toFixed(1) + '%';
+  document.getElementById('tv-recall').textContent    = (closest.recall * 100).toFixed(1) + '%';
+  document.getElementById('tv-f1').textContent        = (closest.f1 * 100).toFixed(1) + '%';
+
+  // Vertical line on chart
+  if (threshChart) {
+    const idx = threshData.findIndex(d => Math.abs(d.threshold - val) < 0.006);
+    threshChart.options.plugins.annotation = undefined;
+    // Just update a dataset for the vertical line via a bar overlay trick
+    if (threshChart.data.datasets.length === 5)
+      threshChart.data.datasets.pop();
+    threshChart.data.datasets.push({
+      type: 'bar', label: 'Current',
+      data: threshData.map((d, i) => i === idx ? 1 : 0),
+      backgroundColor: 'rgba(26,82,118,0.12)',
+      barThickness: 4, order: 10,
+    });
+    threshChart.update('none');
+  }
+
+  // Business tip
+  const tip = document.getElementById('thresh-tip');
+  if (val < 0.25) {
+    tip.className = 'thresh-tip aggressive';
+    tip.textContent = `Aggressive: ${closest.approval_rate}% of applicants approved. High recall (${(closest.recall*100).toFixed(0)}%) but low precision — many false alarms.`;
+  } else if (val > 0.6) {
+    tip.className = 'thresh-tip conservative';
+    tip.textContent = `Conservative: only ${closest.approval_rate}% approved. High precision (${(closest.precision*100).toFixed(0)}%) but low recall — missing ${(100 - closest.recall*100).toFixed(0)}% of actual defaults.`;
+  } else {
+    tip.className = 'thresh-tip balanced';
+    tip.textContent = `Balanced: ${closest.approval_rate}% approved. F1=${( closest.f1*100).toFixed(1)}% — good trade-off between catching defaults and not rejecting good applicants.`;
+  }
+}
+
+document.getElementById('thresh-slider').addEventListener('input', e =>
+  updateThreshold(parseFloat(e.target.value)));
+
+// Load on page ready
+loadThreshData();
+</script>
+{% endblock %}

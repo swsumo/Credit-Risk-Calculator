@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Credit Risk Scoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">💳</div>
+    <div class="login-title">Credit Risk Scoring</div>
+    <div class="login-sub">Powered by XGBoost · SHAP · Groq AI</div>
+
+    {% if error %}
+    <div class="login-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="Enter username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-primary">Login</button>
+    </form>
+
+    <p class="hint">Demo: <code>demo</code> / <code>demo123</code></p>
+    <p class="hint" style="margin-top:10px">
+      New here? <a href="{{ url_for('signup') }}" style="color:var(--accent)">Create an account</a>
+    </p>
+  </div>
+</div>
+</body>
+</html>

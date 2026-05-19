@@ -1,0 +1,5 @@
+{
+  "logistic_regression": 0.44,
+  "xgboost_credit": 0.64,
+  "lightgbm_credit": 0.36
+}

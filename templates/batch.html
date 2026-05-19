@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% set active_page = "batch" %}
+
+{% block title %}Batch Predict{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Batch Risk Assessment</h1>
+  <p>Upload a CSV file to score multiple applicants at once.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start">
+
+  <!-- Upload card -->
+  <div class="card">
+    <h2>Upload CSV</h2>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">📂</div>
+      <div class="drop-text">Drag & drop or <label for="file-input" class="drop-link">browse</label></div>
+      <div class="drop-sub">CSV files only · max 5 MB</div>
+      <input type="file" id="file-input" accept=".csv" style="display:none">
+    </div>
+
+    <div id="file-name" class="file-name-tag hidden"></div>
+
+    <button class="btn-primary" id="upload-btn" onclick="runBatch()" disabled>
+      Run Batch Assessment
+    </button>
+
+    <hr class="divider">
+
+    <h3>Required CSV columns</h3>
+    <div class="col-list">
+      <code>age</code> <code>gender</code> <code>education</code>
+      <code>family_status</code> <code>n_children</code> <code>income</code>
+      <code>loan_amt</code> <code>annuity</code> <code>own_car</code>
+      <code>own_realty</code> <code>ext1</code>
+      <code>ext2 (CIBIL 300-900)</code>
+      <code>ext3</code> <code>emp_type</code> <code>years_employed</code>
+      <code>n_inquiries</code>
+    </div>
+    <p class="text-muted mt-8" style="font-size:12px">
+      <strong>ext2</strong> = CIBIL score (300–900). <strong>ext1, ext3</strong> = bureau scores (0–100). Missing columns use defaults.
+    </p>
+
+    <button class="btn-secondary" onclick="downloadSample()" style="width:100%;margin-top:12px">
+      Download Sample CSV
+    </button>
+  </div>
+
+  <!-- Results panel -->
+  <div>
+    <div id="batch-placeholder" class="result-placeholder" style="padding:40px 20px">
+      <div class="icon">📋</div>
+      <p>Upload a CSV and click <strong>Run Batch Assessment</strong></p>
+    </div>
+
+    <div id="batch-results" class="hidden">
+      <!-- Summary KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px" id="batch-kpis"></div>
+
+      <!-- Results table -->
+      <div class="card" style="padding:16px;overflow-x:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h2 style="margin:0">Results</h2>
+          <button class="btn-secondary" onclick="downloadResults()">Download CSV</button>
+        </div>
+        <table id="batch-table">
+          <thead id="batch-thead"></thead>
+          <tbody id="batch-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.drop-zone {
+  border: 2px dashed #c8dff0; border-radius: 12px;
+  padding: 32px 16px; text-align: center; cursor: pointer;
+  transition: all 0.2s; margin-bottom: 14px; background: #f8fbfd;
+}
+.drop-zone.dragover { border-color: var(--accent); background: var(--light); }
+.drop-icon { font-size: 36px; margin-bottom: 8px; }
+.drop-text { font-size: 14px; color: var(--text); }
+.drop-link { color: var(--accent); cursor: pointer; text-decoration: underline; }
+.drop-sub  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.file-name-tag {
+  background: var(--light); border-radius: 8px; padding: 8px 12px;
+  font-size: 13px; color: var(--blue); margin-bottom: 12px;
+}
+.col-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.col-list code {
+  background: var(--light); border-radius: 4px;
+  padding: 2px 8px; font-size: 12px; color: var(--blue);
+}
+.risk-low    { color: #1E8449; font-weight: 600; }
+.risk-medium { color: #B7770D; font-weight: 600; }
+.risk-high   { color: #922B21; font-weight: 600; }
+.dec-approve { color: #1E8449; font-weight: 700; }
+.dec-review  { color: #E74C3C; font-weight: 700; }
+.mini-kpi-card { background:var(--white); border-radius:10px; padding:12px 14px; text-align:center; box-shadow:var(--shadow); }
+.mini-kpi-card .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; }
+.mini-kpi-card .val { font-size:20px; font-weight:700; color:var(--blue); margin-top:2px; }
+</style>
+
+<script>
+let uploadedFile = null;
+let batchData    = null;
+
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const uploadBtn = document.getElementById('upload-btn');
+const fileTag   = document.getElementById('file-name');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  setFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+
+function setFile(f) {
+  if (!f || !f.name.endsWith('.csv')) { alert('Please upload a .csv file'); return; }
+  uploadedFile = f;
+  fileTag.textContent = `📄 ${f.name}  (${(f.size/1024).toFixed(1)} KB)`;
+  fileTag.classList.remove('hidden');
+  uploadBtn.disabled = false;
+}
+
+async function runBatch() {
+  if (!uploadedFile) return;
+  uploadBtn.disabled = true;
+  uploadBtn.innerHTML = '<span class="spinner"></span> Processing…';
+
+  const fd = new FormData();
+  fd.append('file', uploadedFile);
+
+  try {
+    const resp = await fetch('/api/batch_predict', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    batchData = data;
+    renderBatch(data);
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Run Batch Assessment';
+  }
+}
+
+function renderBatch(data) {
+  document.getElementById('batch-placeholder').classList.add('hidden');
+  document.getElementById('batch-results').classList.remove('hidden');
+
+  const results = data.results;
+  const total   = results.length;
+  const low     = results.filter(r => r.risk_class === 'low').length;
+  const mid     = results.filter(r => r.risk_class === 'medium').length;
+  const high    = results.filter(r => r.risk_class === 'high').length;
+  const avgProb = (results.reduce((s, r) => s + r.default_prob, 0) / total).toFixed(1);
+
+  document.getElementById('batch-kpis').innerHTML = [
+    ['Total', total],
+    ['Avg Risk', avgProb + '%'],
+    ['Approve', results.filter(r => r.decision === 'APPROVE').length],
+    ['Review', results.filter(r => r.decision === 'REVIEW').length],
+  ].map(([l, v]) => `<div class="mini-kpi-card"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join('');
+
+  // Build table
+  const displayCols = ['age','gender','income','loan_amt','ext2','emp_type',
+                       'default_prob','risk_label','decision'];
+  const headers = displayCols.map(c => `<th>${c.replace(/_/g,' ')}</th>`).join('');
+  document.getElementById('batch-thead').innerHTML = `<tr>${headers}</tr>`;
+
+  const rows = results.map(r => {
+    const cells = displayCols.map(c => {
+      let val = r[c] ?? '-';
+      if (c === 'risk_label') return `<td class="risk-${r.risk_class}">${val}</td>`;
+      if (c === 'decision') return `<td class="${val === 'APPROVE' ? 'dec-approve' : 'dec-review'}">${val}</td>`;
+      if (c === 'income' || c === 'loan_amt') return `<td>₹${Number(val).toLocaleString()}</td>`;
+      if (c === 'default_prob') return `<td><strong>${val}%</strong></td>`;
+      return `<td>${val}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+  document.getElementById('batch-tbody').innerHTML = rows;
+}
+
+function downloadResults() {
+  if (!batchData) return;
+  const rows = batchData.results;
+  const cols = Object.keys(rows[0]);
+  const csv  = [cols.join(','),
+    ...rows.map(r => cols.map(c => JSON.stringify(r[c] ?? '')).join(','))
+  ].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'credit_risk_results.csv';
+  a.click();
+}
+
+function downloadSample() {
+  // Download the pre-built sample with 5 showcase cases (best/good/medium/bad/worst)
+  window.location.href = "{{ url_for('static', filename='data/sample_cases.csv') }}";
+}
+</script>
+{% endblock %}
