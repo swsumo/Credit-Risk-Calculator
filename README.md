@@ -1,6 +1,5 @@
 # Credit Risk Scoring Model
 
-**Swapnil Mogal · B.Tech Data Science · Manipal University Jaipur 2026**
 
 End-to-end credit risk scoring system trained on **307,511 real Home Credit loan applications**. Predicts default probability with per-customer SHAP explanations and a Groq AI analyst.
 
